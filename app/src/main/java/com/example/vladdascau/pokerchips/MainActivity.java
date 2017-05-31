@@ -170,7 +170,7 @@ class NetworkThread extends AsyncTask<String, String, String> {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return "Cool";
+        return "Cooler than you";
     }
 
 }
