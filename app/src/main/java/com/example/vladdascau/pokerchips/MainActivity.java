@@ -9,32 +9,31 @@ import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int MAX_PLAYERS = 3;
+    private static final int HOST_PORT = 9020;
+    private static final int SOCKET_TIMEOUT = 2000;
     WifiP2pManager mManager;
     WifiP2pManager.Channel mChannel;
     BroadcastReceiver mReceiver;
     IntentFilter mIntentFilter;
     private WifiP2pManager.PeerListListener peers;
-
-    private static final int MAX_PLAYERS = 3;
-    private static final int HOST_PORT = 9020;
-    private static final int SOCKET_TIMEOUT = 2000;
-
     private int initialAmount = 1000;
     private Player players[];
     private int currentNoOfPlayers = 0;
@@ -55,10 +54,48 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void search(View v) {
+        /* Open a new activity where a list of games is displayed */
+    }
 
-    public void buton(View v) {
+    public void host_service(View v) {
+        //  Create a string map containing information about your service.
+        Map record = new HashMap();
+        record.put("listenport", String.valueOf(HOST_PORT));
+        record.put("buddyname", "John Doe" + (int) (Math.random() * 1000));
+        record.put("available", "visible");
+
+        // Service information.  Pass it an instance name, service type
+        // _protocol._transportlayer , and the map containing
+        // information other devices will want once they connect to this one.
+        WifiP2pDnsSdServiceInfo serviceInfo =
+                WifiP2pDnsSdServiceInfo.newInstance("_test", "_presence._tcp", record);
+
+        // Add the local service, sending the service info, network channel,
+        // and listener that will be used to indicate success or failure of
+        // the request.
+        mManager.addLocalService(mChannel, serviceInfo, new WifiP2pManager.ActionListener() {
+            @Override
+            public void onSuccess() {
+                // Command successful! Code isn't necessarily needed here,
+                // Unless you want to update the UI or add logging statements.
+                System.out.println("Success creating local service !");
+            }
+
+            @Override
+            public void onFailure(int arg0) {
+                // Command failed.  Check for P2P_UNSUPPORTED, ERROR, or BUSY
+                System.out.println("Failed creating local service !");
+            }
+        });
+
+
+    }
+
+    public void host(View v) {
         /* We know that if this button was pressed we are the host ! */
         try {
+            players = new Player[MAX_PLAYERS];
             players[0] = new Player(0, initialAmount, null); // Local player with the same amount, playerId 0 and null Socket
         } catch (IOException e) {
             e.printStackTrace();
@@ -142,7 +179,7 @@ class NetworkThread extends AsyncTask<String, String, String> {
 
     public NetworkThread(boolean groupFormed, InetAddress ownerAddress, int port, int timeout, int id, int amount){
         isGroupFormed = groupFormed;
-        ownerAddress = groupOwnerAddress;
+        groupOwnerAddress = ownerAddress;
         hostPort = port;
         socketTimeout = timeout;
         playerId = id;
