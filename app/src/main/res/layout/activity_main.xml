@@ -13,24 +13,33 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="UserName"
-        android:id="@+id/textView" />
+        android:id="@+id/userName" />
 
     <EditText
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/editText"
         android:layout_alignParentTop="true"
-        android:layout_toRightOf="@+id/textView" />
+        android:layout_toRightOf="@+id/userName" />
 
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="OK"
-        android:id="@+id/OKbutton"
+        android:text="Host"
+        android:id="@+id/hostGame"
         android:layout_below="@+id/editText"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:enabled="true"
-        android:onClick="buton" />
+        android:onClick="hostService" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SEARCH FOR ROOM"
+        android:id="@+id/searchForRoom"
+        android:layout_below="@+id/editText"
+        android:layout_centerHorizontal="true"
+        android:onClick="searchGame" />
 
 </RelativeLayout>
