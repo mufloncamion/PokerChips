@@ -1,9 +1,12 @@
 package com.example.vladdascau.pokerchips;
 
+import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.DhcpInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
@@ -14,26 +17,31 @@ import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.os.AsyncTask;
-import android.support.annotation.NonNull;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.view.View;
-import android.widget.TextView;
-import android.widget.Toast;
 
 
-import com.google.android.gms.games.Players;
-
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity
+{
 
     WifiP2pManager mManager;
     WifiP2pManager.Channel mChannel;
@@ -45,7 +53,6 @@ public class MainActivity extends AppCompatActivity {
 
     private InetAddress hostAddress;
 
-    private static final int MAX_PLAYERS = 3;
     private static final int HOST_PORT = 9020;
     private static final int SOCKET_TIMEOUT = 2000;
     private static final String DEFAULT_HOST_NAME = "PokerChips HOST";
@@ -59,11 +66,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean amHost = false;
 
     private int initialAmount = 1000;
+
+    private static final int MAX_PLAYERS = 3;
     private Player players[] = new Player[MAX_PLAYERS];
     private int currentNoOfPlayers = 0;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
@@ -80,37 +90,100 @@ public class MainActivity extends AppCompatActivity {
 
     ;
 
-    public void findServices() {
-        mManager.setDnsSdResponseListeners(mChannel, servListener, txtListener);
+    public void findServices()
+    {
 
-        WifiP2pServiceRequest serviceRequest = WifiP2pDnsSdServiceRequest.newInstance();
+        WifiP2pDnsSdServiceRequest serviceRequest = WifiP2pDnsSdServiceRequest.newInstance();
         mManager.addServiceRequest(mChannel,
                 serviceRequest,
-                new WifiP2pManager.ActionListener() {
+                new WifiP2pManager.ActionListener()
+                {
                     @Override
-                    public void onSuccess() {
+                    public void onSuccess()
+                    {
+                        System.out.println("Adding service request !!");
                         // Success!
-                        System.out.println("Success adding Service Request !");
                     }
 
                     @Override
-                    public void onFailure(int code) {
+                    public void onFailure(int code)
+                    {
+                        System.out.println("Failed adding service request !!");
                         // Command failed.  Check for P2P_UNSUPPORTED, ERROR, or BUSY
                     }
                 });
 
-        mManager.discoverServices(mChannel, new WifiP2pManager.ActionListener() {
+        mManager.discoverServices(mChannel, new WifiP2pManager.ActionListener()
+        {
 
             @Override
-            public void onSuccess() {
+            public void onSuccess()
+            {
                 // Success!
+                System.out.println("Service discovery initiated");
                 System.out.println("Success discovering Services ! " + mChannel.toString());
+                mManager.setDnsSdResponseListeners(mChannel,
+                        new WifiP2pManager.DnsSdServiceResponseListener()
+                        {
+                            @Override
+                            public void onDnsSdServiceAvailable(String instanceName,
+                                                                String registrationType, WifiP2pDevice device)
+                            {
+
+                                // A service has been discovered. Is this our app?
+                                if (instanceName.equalsIgnoreCase("PokerChips"))
+                                {
+                                    // yes it is
+
+                                    WifiP2pConfig wifiP2pConfig = new WifiP2pConfig();
+                                    wifiP2pConfig.deviceAddress = device.deviceAddress;
+                                    wifiP2pConfig.groupOwnerIntent = 0;
+                                    wifiP2pConfig.wps.setup = WpsInfo.PBC;
+
+                                    if (mManager != null)
+                                    {
+                                        mManager.connect(mChannel, wifiP2pConfig,
+                                                new WifiP2pManager.ActionListener()
+                                                {
+
+                                                    @Override
+                                                    public void onSuccess()
+                                                    {
+                                                        // WiFiDirectBroadcastReceiver will notify us.
+                                                    }
+
+                                                    @Override
+                                                    public void onFailure(int reason)
+                                                    {
+                                                    }
+                                                });
+                                    }
+                                }
+                            }
+                        }, new WifiP2pManager.DnsSdTxtRecordListener()
+                        {
+
+                            @Override
+                            public void onDnsSdTxtRecordAvailable(
+                                    String fullDomainName, Map<String, String> record,
+                                    WifiP2pDevice device)
+                            {
+                                boolean isGroupOwner = device.isGroupOwner();
+                                int port = Integer.parseInt(record.get("port").toString());
+
+                                System.out.println("Am descoperit serviciul pe portul " + port);
+                                // further process
+                            }
+                        });
+
             }
 
             @Override
-            public void onFailure(int code) {
+            public void onFailure(int code)
+            {
                 // Command failed.  Check for P2P_UNSUPPORTED, ERROR, or BUSY
-                if (code == WifiP2pManager.P2P_UNSUPPORTED) {
+                if (code == WifiP2pManager.P2P_UNSUPPORTED)
+                {
                     System.out.println("P2P isn't supported on this device.");
                 }
             }
@@ -118,11 +191,14 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public void searchGame(View v) {
+    public void searchGame(View v)
+    {
 
         amHost = false;
+        findServices();
 
-        txtListener = new WifiP2pManager.DnsSdTxtRecordListener() {
+        txtListener = new WifiP2pManager.DnsSdTxtRecordListener()
+        {
             @Override
         /* Callback includes:
          * fullDomain: full domain name: e.g "printer._ipp._tcp.local."
@@ -131,149 +207,108 @@ public class MainActivity extends AppCompatActivity {
          */
 
             public void onDnsSdTxtRecordAvailable(
-                    String fullDomain, Map record, WifiP2pDevice device) {
+                    String fullDomain, Map record, WifiP2pDevice device)
+            {
                 System.out.println("DnsSdTxtRecord available -" + record.toString());
 
             }
         };
 
-        servListener = new WifiP2pManager.DnsSdServiceResponseListener() {
+        servListener = new WifiP2pManager.DnsSdServiceResponseListener()
+        {
             @Override
             public void onDnsSdServiceAvailable(String instanceName, String registrationType,
-                                                WifiP2pDevice resourceType) {
-
+                                                WifiP2pDevice resourceType)
+            {
+                System.out.println("A venit DNS Service availabl");
+                System.out.println("DnsSdTxtRecord available -" + resourceType.toString());
                 // Update the device name with the human-friendly version from
                 // the DnsTxtRecord, assuming one arrived.
-                currentNoOfPlayers++;
-                try {
-                    players[currentNoOfPlayers] = new Player(currentNoOfPlayers, initialAmount, null); // null e socketul corespunzator fiecaruia pe care il initializam la startul jocului
-                }
-                catch (Exception e)
-                {
-                    System.out.println("Exception creating new player !");
-                }
-                System.out.println("- Service discovered from - " + resourceType.deviceName + " !!");
                 /* We're on the client side and we've found the service. We should implement a thread
                  * to connect to the device id and port received  */
+
             }
         };
-        findServices();
-    };
 
-    public void hostService(View v) {
+
+    }
+
+    ;
+
+
+    public void hostService(View v)
+    {
 
         Map record = new HashMap();
-        record.put("port", String.valueOf(HOST_PORT));
         record.put("gameName", "PokerChips");
         record.put("available", "visible");
         record.put("hostName", hostName);
+        record.put("port", String.valueOf(HOST_PORT));
 
         amHost = true;
+
 
         // Service information.  Pass it an instance name, service type
         // _protocol._transportlayer , and the map containing
         // information other devices will want once they connect to this one.
         WifiP2pDnsSdServiceInfo serviceInfo =
-                WifiP2pDnsSdServiceInfo.newInstance("_test", "_presence._tcp", record);
+                WifiP2pDnsSdServiceInfo.newInstance("PokerChips", "_presence._tcp", record);
 
         // Add the local service, sending the service info, network channel,
         // and listener that will be used to indicate success or failure of
         // the request.
+        mManager.addLocalService(mChannel, serviceInfo, new WifiP2pManager.ActionListener()
+        {
 
-        mManager.addLocalService(mChannel, serviceInfo, new WifiP2pManager.ActionListener() {
             @Override
-            public void onSuccess() {
-                // Command successful! Code isn't necessarily needed here,
-                // Unless you want to update the UI or add logging statements.
-                System.out.println("Pornesc LOCAL Service !");
+            public void onSuccess()
+            {
+                System.out.println("Added local service");
             }
 
             @Override
-            public void onFailure(int arg0) {
-                // Command failed.  Check for P2P_UNSUPPORTED, ERROR, or BUSY
-            }
-        });
-
-    }
-
-
-    public void hostGame(View v) {
-        /* We know that if this button was pressed we are the host ! */
-        try {
-            players[0] = new Player(0, initialAmount, null); // Local player with the same amount, playerId 0 and null Socket
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        TextView uName = (TextView) findViewById(R.id.userName);
-        String gameName = "Game " + uName.getText();
-
-        mManager.discoverPeers(mChannel, new WifiP2pManager.ActionListener() {
-            @Override
-            public void onSuccess() {
-                System.out.println("Am descoperit !");
-            }
-
-            @Override
-            public void onFailure(int reasonCode) {
-                System.out.println("N-Am descoperit !");
+            public void onFailure(int error)
+            {
+                System.out.println("ERRORCEPTION: Failed to add a service");
             }
         });
-        if (mManager != null) {
-            peers = new WifiP2pManager.PeerListListener() {
-                @Override
-                public void onPeersAvailable(WifiP2pDeviceList peers) {
-                    System.out.println("Sunt peers available " + peers.getDeviceList().size() + "!!!");
-                    for (final WifiP2pDevice device : peers.getDeviceList()) {
-                        System.out.println(device.deviceName + " = " + device.deviceAddress);
-                        WifiP2pConfig config = new WifiP2pConfig();
-                        config.deviceAddress = device.deviceAddress;
-                        config.wps.setup = WpsInfo.PBC;
 
-                        mManager.connect(mChannel, config, new WifiP2pManager.ActionListener() {
 
-                            @Override
-                            public void onSuccess() {
-                                // WiFiDirectBroadcastReceiver will notify us. Ignore for now.
-                                System.out.println(" M-am conectat la " + device.deviceName + " " + device.deviceAddress);
+        /*
+        mManager.createGroup(mChannel,new WifiP2pManager.ActionListener()
+        {
+            @Override
+            public void onSuccess()
+            {
+                System.out.println(" Creez GRUPUL !!!!!!!!!!!!!!!!!!!!");
+                WifiManager wifiMgr = (WifiManager) getSystemService(WIFI_SERVICE);
+                WifiInfo wifiInfo = wifiMgr.getConnectionInfo();
+                int ip = wifiInfo.getIpAddress();
+                String ipAddress = Formatter.formatIpAddress(ip);
+                System.out.println("Ip-ul hostului va fi " + ipAddress);
+            }
 
-                                mManager.requestConnectionInfo(mChannel, new WifiP2pManager.ConnectionInfoListener() {
-                                    @Override
-                                    public void onConnectionInfoAvailable(WifiP2pInfo info) {
-                                        System.out.println("Aici in onConnectionInfoAvailable e " + info.groupFormed + " " + info.groupOwnerAddress);
-
-                                        currentNoOfPlayers++;
-                                        //NetworkThread networkThread = new NetworkThread(info.groupFormed ,info.groupOwnerAddress,
-                                        //                      HOST_PORT, SOCKET_TIMEOUT, currentNoOfPlayers,initialAmount);
-                                        Toast.makeText(getApplicationContext(), "Client socket connected ",
-                                                Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                            }
-
-                            @Override
-                            public void onFailure(int reason) {
-                                Toast.makeText(getApplicationContext(), "Connect failed. Retry.",
-                                        Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
-                }
-            };
-            mManager.requestPeers(mChannel, peers);
-        }
-
+            @Override
+            public void onFailure(int reason)
+            {
+                System.out.println("N-am putut sa creez grupul pentru ca "+reason);
+            }
+        });
+        */
     }
 
     /* register the broadcast receiver with the intent values to be matched */
     @Override
-    protected void onResume() {
+    protected void onResume()
+    {
         super.onResume();
         registerReceiver(mReceiver, mIntentFilter);
     }
 
     /* unregister the broadcast receiver */
     @Override
-    protected void onPause() {
+    protected void onPause()
+    {
         super.onPause();
         unregisterReceiver(mReceiver);
     }

@@ -3,51 +3,32 @@ package com.example.vladdascau.pokerchips;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.Socket;
 
 /**
  * Created by vlad.dascau on 5/23/2017.
  */
 public class Player extends User {
-    private int playerId;
     private long currentAmount;
     private int positionInTop;
     private boolean isHost,isSmallBlind, isBigBlind;
-    private Socket socket;
-    private DataOutputStream dataOutputStream;
-    private DataInputStream dataInputStream;
-
-    public int getPlayerId() {
-        return playerId;
-    }
-
-    public void setPlayerId(int playerId) {
-        this.playerId = playerId;
-    }
 
     public long getCurrentAmount() {
         return currentAmount;
     }
 
-    public Player(int playerId, long currentAmount, Socket sock) throws IOException {
-        this.playerId = playerId;
+    // Varianta apelata de client
+    public Player(String username, long currentAmount, InetAddress hostAddress, int hostPort) throws IOException {
+        super(username, hostAddress, hostPort);
         this.currentAmount = currentAmount;
-        if (sock != null) {
-            dataOutputStream = new DataOutputStream(sock.getOutputStream());
-            dataInputStream = new DataInputStream(sock.getInputStream());
-        }
-
     }
 
-    public void writeToStream(String message) {
-        try {
-            dataOutputStream.writeUTF(message);
-            dataOutputStream.flush();
-        }
-        catch (Exception e)
-        {
-            System.out.println("Cannot write to Player " + playerId +"(" + e.getMessage() + ")");
-        }
+    // Varianta apelata de server
+    public Player(String username, long currentAmount)
+    {
+        super(username);
+        this.currentAmount = currentAmount;
     }
 
     public void setCurrentAmount(long currentAmount) {
